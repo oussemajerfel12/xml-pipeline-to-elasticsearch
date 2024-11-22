@@ -25,11 +25,11 @@ import org.w3c.dom.NodeList;
 
 
 public class Main {
-    private static final String ZIP_FILE_PATH = "C:\\Users\\oussemajerfel\\Desktop\\java_program\\xml.zip";
-    private static final String UNZIP_FOLDER = "unzipped";
+    public static final String ZIP_FILE_PATH = "C:\\Users\\oussemajerfel\\Desktop\\java_program\\xml.zip";
+    public static final String UNZIP_FOLDER = "unzipped";
 
 
-    private static void unzip(String filePath) throws IOException {
+    public static void unzip(String filePath) throws IOException {
         File destDir = new File(UNZIP_FOLDER);
         if (!destDir.exists()) {
             destDir.mkdir();
@@ -99,7 +99,7 @@ public class Main {
         }
     }
 
-    private static void indexToElasticsearch(RestHighLevelClient client, BulkRequest bulkRequest) throws IOException {
+    public static void indexToElasticsearch(RestHighLevelClient client, BulkRequest bulkRequest) throws IOException {
         BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
         if (bulkResponse.hasFailures()) {
             System.out.println("Bulk indexing failed!");
