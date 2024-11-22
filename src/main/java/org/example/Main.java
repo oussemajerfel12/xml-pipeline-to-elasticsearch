@@ -8,6 +8,8 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.CreateIndexRequest;
+import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.xcontent.XContentType;
 import org.json.JSONObject;
 
@@ -60,6 +62,7 @@ public class Main {
         if (listOfFiles != null) {
             BulkRequest bulkRequest = new BulkRequest();
             try (RestHighLevelClient client = createElasticsearchClient()) {
+                ensureIndexExists(client);
                 for (File file : listOfFiles) {
                     DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
                     DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -105,6 +108,18 @@ public class Main {
             System.out.println("Bulk indexing failed!");
         } else {
             System.out.println("Bulk indexing successful!");
+        }
+    }
+
+    private static void ensureIndexExists(RestHighLevelClient client) throws IOException {
+        GetIndexRequest request = new GetIndexRequest("products");
+        boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
+        if (!exists) {
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest("products");
+            client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+            System.out.println("Index 'products' created.");
+        } else {
+            System.out.println("Index 'products' already exists.");
         }
     }
 
