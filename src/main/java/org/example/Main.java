@@ -46,19 +46,20 @@ public class Main {
         }
     }
 
+    private static RestHighLevelClient createElasticsearchClient() {
+        RestClientBuilder builder = RestClient.builder(new HttpHost("localhost", 9200, "http"))
+                .setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
+                        .setConnectTimeout(5000)
+                        .setSocketTimeout(60000));
+        return new RestHighLevelClient(builder);
+    }
+
     private static void parseXMLFiles() throws Exception {
         File folder = new File(UNZIP_FOLDER);
         File[] listOfFiles = folder.listFiles((dir, name) -> name.endsWith(".xml"));
-
         if (listOfFiles != null) {
             BulkRequest bulkRequest = new BulkRequest();
-            RestClientBuilder builderClient = RestClient.builder(new HttpHost("localhost", 9200, "http"))
-                    .setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
-                            .setConnectTimeout(5000)
-                            .setSocketTimeout(60000));
-
-            try (RestHighLevelClient client = new RestHighLevelClient(builderClient)) {
-
+            try (RestHighLevelClient client = createElasticsearchClient()) {
                 for (File file : listOfFiles) {
                     DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
                     DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -92,6 +93,8 @@ public class Main {
                 if (bulkRequest.numberOfActions() > 0) {
                     indexToElasticsearch(client, bulkRequest);
                 }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
     }
