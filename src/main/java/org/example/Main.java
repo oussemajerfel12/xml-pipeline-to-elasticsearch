@@ -1,22 +1,33 @@
 package org.example;
 
 import org.apache.http.HttpHost;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
+import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.xcontent.XContentType;
+import org.json.JSONObject;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+
 
 public class Main {
     private static final String ZIP_FILE_PATH = "C:\\Users\\oussemajerfel\\Desktop\\java_program\\xml.zip";
     private static final String UNZIP_FOLDER = "unzipped";
+
 
     private static void unzip(String filePath) throws IOException {
         File destDir = new File(UNZIP_FOLDER);
@@ -40,28 +51,58 @@ public class Main {
         File[] listOfFiles = folder.listFiles((dir, name) -> name.endsWith(".xml"));
 
         if (listOfFiles != null) {
-            for (File file : listOfFiles) {
-                DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-                DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-                Document doc = dBuilder.parse(file);
-                doc.getDocumentElement().normalize();
+            BulkRequest bulkRequest = new BulkRequest();
+            RestClientBuilder builderClient = RestClient.builder(new HttpHost("localhost", 9200, "http"))
+                    .setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
+                            .setConnectTimeout(5000)
+                            .setSocketTimeout(60000));
 
-                NodeList products = doc.getElementsByTagName("product");
-                for (int i = 0; i < products.getLength(); i++) {
-                    String sku = doc.getElementsByTagName("article_sku").item(i).getTextContent();
-                    String brand = doc.getElementsByTagName("brand").item(i).getTextContent();
-                    String description = doc.getElementsByTagName("full_description").item(i).getTextContent();
+            try (RestHighLevelClient client = new RestHighLevelClient(builderClient)) {
 
-                    System.out.println("SKU: " + sku);
-                    System.out.println("Brand: " + brand);
-                    System.out.println("Description: " + description);
+                for (File file : listOfFiles) {
+                    DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+                    DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+                    Document doc = dBuilder.parse(file);
+                    doc.getDocumentElement().normalize();
+
+                    NodeList products = doc.getElementsByTagName("product");
+
+                    for (int i = 0; i < products.getLength(); i++) {
+                        String sku = doc.getElementsByTagName("article_sku").item(i).getTextContent();
+                        String brand = doc.getElementsByTagName("brand").item(i).getTextContent();
+                        String description = doc.getElementsByTagName("full_description").item(i).getTextContent();
+
+                        JSONObject jsonObject = new JSONObject();
+                        jsonObject.put("sku", sku);
+                        jsonObject.put("brand", brand);
+                        jsonObject.put("description", description);
+
+                        IndexRequest request = new IndexRequest("products")
+                                .id(sku)
+                                .source(jsonObject.toString(), XContentType.JSON);
+
+                        bulkRequest.add(request);
+
+                        if (bulkRequest.numberOfActions() == 1000) {
+                            indexToElasticsearch(client, bulkRequest);
+                            bulkRequest = new BulkRequest();
+                        }
+                    }
+                }
+                if (bulkRequest.numberOfActions() > 0) {
+                    indexToElasticsearch(client, bulkRequest);
                 }
             }
         }
     }
 
-    public static RestClient createElasticsearchClient() {
-        return RestClient.builder(new HttpHost("localhost", 9200, "http")).build();
+    private static void indexToElasticsearch(RestHighLevelClient client, BulkRequest bulkRequest) throws IOException {
+        BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+        if (bulkResponse.hasFailures()) {
+            System.out.println("Bulk indexing failed!");
+        } else {
+            System.out.println("Bulk indexing successful!");
+        }
     }
 
     public static void main(String[] args) {
